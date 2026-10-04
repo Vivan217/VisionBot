@@ -12,15 +12,14 @@ def get_twilio() -> Client:
     return Client(st.secrets["TWILIO_ACCOUNT_SID"], st.secrets["TWILIO_AUTH_TOKEN"])
 
 
-def write_summary(gemini_client, model: str, result, user_text: str = "") -> str:
+def write_summary(generate, result, user_text: str = "") -> str:
     """Second Gemini call: turns the structured analysis into a short chat recap."""
     prompt = WHATSAPP_SUMMARY_PROMPT.format(
         meal_json=result.model_dump_json(),
         user_text=user_text,
     )
-    response = gemini_client.models.generate_content(model=model, contents=prompt)
+    response = generate(contents=prompt)
     return response.text.strip()
-
 
 def send_whatsapp(to_number: str, text: str) -> str:
     """Sends the recap. Uses the Content Template if a Content SID is set, else a plain body."""
