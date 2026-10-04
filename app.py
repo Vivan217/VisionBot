@@ -9,7 +9,7 @@ from prompts import SYSTEM_PROMPT, USER_PROMPT
 from whatsapp import send_whatsapp, write_summary
 
 MODEL = "gemini-3.8-flash"  # main model
-FALLBACK_MODELS = ["gemini-2.5-flash"]  # used if the main one is overloaded (503)
+FALLBACK_MODELS = []  # used if the main one is overloaded (503)
 
 
 class FoodItem(BaseModel):
@@ -34,19 +34,24 @@ def get_client() -> genai.Client:
 
 
 def generate_with_retry(contents, config=None):
-    """Tries the main model, retries on 503/overload, then falls back to another model."""
+    """Retries on 503/overload. Skips a model that is no longer available (404)."""
     client = get_client()
     last_error = None
     for model in [MODEL, *FALLBACK_MODELS]:
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 return client.models.generate_content(model=model, contents=contents, config=config)
-            except errors.ServerError as e:
+            except errors.ServerError as e:  # 5xx: overloaded, wait and retry
                 last_error = e
-                time.sleep(2**attempt)  # wait 1s, 2s, 4s
+                time.sleep(2 ** (attempt + 1))  # 2s, 4s, 8s, 16s
+            except errors.ClientError as e:
+                if e.code == 404:  # model not available, try the next one
+                    last_error = e
+                    break
+                raise
     if last_error is not None:
         raise last_error
-    raise RuntimeError("Failed to generate content: all retry attempts failed.")
+    raise RuntimeError("Failed to generate content: all models and retries exhausted.")
 
 
 def analyze_meal(image_bytes: bytes, mime_type: str) -> MealAnalysis:
