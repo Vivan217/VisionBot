@@ -13,13 +13,12 @@ def get_twilio() -> Client:
 
 
 def write_summary(generate, result, user_text: str = "") -> str:
-    """Second Gemini call: turns the structured analysis into a short chat recap."""
-    prompt = WHATSAPP_SUMMARY_PROMPT.format(
-        meal_json=result.model_dump_json(),
-        user_text=user_text,
-    )
-    response = generate(contents=prompt)
-    return response.text.strip()
+    """Builds the WhatsApp recap locally, with no extra Gemini call."""
+    lines = [f"🍽️ *{result.total_calories} kcal | {result.total_protein_g:.1f}g protein*", ""]
+    for i in result.items:
+        lines.append(f"• {i.name} ({i.portion}) - {i.calories} kcal, {i.protein_g:.1f}g protein")
+    lines += ["", result.note]
+    return "\n".join(lines)
 
 def send_whatsapp(to_number: str, text: str) -> str:
     """Sends the recap. Uses the Content Template if a Content SID is set, else a plain body."""

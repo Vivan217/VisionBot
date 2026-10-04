@@ -110,8 +110,11 @@ if image:
             st.session_state["result"] = result
             st.session_state["result_file"] = image.file_id
             st.session_state.pop("summary", None)
-        except errors.ServerError:
-            st.error("Gemini is overloaded right now. Wait a minute and press Analyze again.")
+        except (errors.ServerError, errors.ClientError) as e:
+            if e.code == 429:
+                st.error("Daily free limit reached. Please try again tomorrow.")
+            else:
+                st.error(f"Gemini couldn't process that right now ({e.code}). Try again in a minute.")
 
 # Show the result only if it belongs to the image currently selected
 result = st.session_state.get("result")
